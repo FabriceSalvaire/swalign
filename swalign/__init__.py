@@ -129,7 +129,7 @@ class LocalAlignment(object):
     def __init__(self, scoring_matrix,
                  gap_penalty=-1, gap_extension_penalty=-1, gap_extension_decay=0.0,
                  prefer_gap_runs=True,
-                 verbose=False, globalalign=False, wildcard=None):
+                 verbose=False, wildcard=None):
 
         self.scoring_matrix = scoring_matrix
         self.gap_penalty = gap_penalty
@@ -137,7 +137,6 @@ class LocalAlignment(object):
         self.gap_extension_decay = gap_extension_decay
         self.verbose = verbose
         self.prefer_gap_runs = prefer_gap_runs
-        self.globalalign = globalalign
         self.wildcard = wildcard
 
     ##############################################
@@ -179,12 +178,8 @@ class LocalAlignment(object):
                         if not self.gap_extension_decay:
                             ins_val = matrix.get(row - 1, col)[0] + self.gap_extension_penalty
                         else:
-                            if self.globalalign:
-                                ins_val = (matrix.get(row - 1, col)[0] +
-                                           min(self.gap_extension_penalty + ins_run * self.gap_extension_decay))
-                            else:
-                                ins_val = (matrix.get(row - 1, col)[0] +
-                                           min(0, self.gap_extension_penalty + ins_run * self.gap_extension_decay))
+                            ins_val = (matrix.get(row - 1, col)[0] +
+                                       min(0, self.gap_extension_penalty + ins_run * self.gap_extension_decay))
                 else:
                     ins_val = matrix.get(row - 1, col)[0] + self.gap_penalty
 
@@ -197,20 +192,13 @@ class LocalAlignment(object):
                         if not self.gap_extension_decay:
                             del_val = matrix.get(row, col - 1)[0] + self.gap_extension_penalty
                         else:
-                            if self.globalalign:
-                                del_val = (matrix.get(row, col - 1)[0] +
-                                           min(self.gap_extension_penalty + del_run * self.gap_extension_decay))
-                            else:
-                                del_val = (matrix.get(row, col - 1)[0] +
-                                           min(0, self.gap_extension_penalty + del_run * self.gap_extension_decay))
+                            del_val = (matrix.get(row, col - 1)[0] +
+                                       min(0, self.gap_extension_penalty + del_run * self.gap_extension_decay))
 
                 else:
                     del_val = matrix.get(row, col - 1)[0] + self.gap_penalty
 
-                if self.globalalign:
-                    cell_val = max(mm_val, del_val, ins_val)
-                else:
-                    cell_val = max(mm_val, del_val, ins_val, 0)
+                cell_val = max(mm_val, del_val, ins_val, 0)
 
                 if not self.prefer_gap_runs:
                     ins_run = 0
@@ -237,14 +225,9 @@ class LocalAlignment(object):
                 matrix.set(row, col, val)
 
         # backtrack
-        if self.globalalign:
-            row = matrix.rows - 1
-            col = matrix.cols - 1
-            val = matrix.get(row, col)[0]
-        else:
-            row = max_row
-            col = max_col
-            val = max_val
+        row = max_row
+        col = max_col
+        val = max_val
 
         op = ''
         aln = []
@@ -253,12 +236,8 @@ class LocalAlignment(object):
         while True:
             val, op, runlen = matrix.get(row, col)
 
-            if self.globalalign:
-                if row == 0 and col == 0:
-                    break
-            else:
-                if val <= 0:
-                    break
+            if val <= 0:
+                break
 
             path.append((row, col))
             aln.append(op)
@@ -283,7 +262,7 @@ class LocalAlignment(object):
         cigar = _reduce_cigar(aln)
 
         return Alignment(orig_query, orig_ref, row, col, cigar, max_val,
-                         ref_name, query_name, rc, self.globalalign, self.wildcard)
+                         ref_name, query_name, rc, self.wildcard)
 
     ##############################################
 
@@ -341,7 +320,7 @@ class Alignment(object):
     ##############################################
 
     def __init__(self, query, ref, q_pos, r_pos, cigar, score, ref_name='', query_name='',
-                 rc=False, globalalign=False, wildcard=None):
+                 rc=False, wildcard=None):
 
         self.query = query
         self.ref = ref
@@ -352,7 +331,6 @@ class Alignment(object):
         self.r_name = ref_name
         self.q_name = query_name
         self.rc = rc
-        self.globalalign = globalalign
         self.wildcard = wildcard
 
         self.r_offset = 0
