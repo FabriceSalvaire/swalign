@@ -1,75 +1,10 @@
-#!/usr/bin/env python
+####################################################################################################
 
 ''' Simple Smith-Waterman aligner '''
 
 ####################################################################################################
 
 import sys
-import StringIO
-
-####################################################################################################
-
-class ScoringMatrix(object):
-
-    '''
-    Read scoring matrix from a file or string
-
-    Matrix should be space-delimited in a format like:
-
-      A C G T
-    A 1 0 0 0
-    C 0 1 0 0
-    G 0 0 1 0
-    T 0 0 0 1
-
-    Rows and Columns must be in the same order
-
-    '''
-
-    ##############################################
-
-    def __init__(self, filename=None, text=None, wildcard_score=0):
-
-        assert filename or text
-
-        if filename:
-            fs = open(filename)
-        else:
-            fs = StringIO.StringIO(text)
-
-        self.scores = []
-        self.bases = None
-        self.wildcard_score = wildcard_score
-
-        for line in fs:
-            if line[0] == '#':
-                continue
-
-            if not self.bases:
-                self.bases = line.split()
-                self.base_count = len(self.bases)
-            else:
-                cols = line.split()
-                self.scores.extend([int(x) for x in cols[1:]])
-
-        fs.close()
-
-    ##############################################
-
-    def score(self, one, two, wildcard=None):
-
-        if self.wildcard_score and wildcard and (one in wildcard or two in wildcard):
-            return self.wildcard_score
-
-        one_idx = 0
-        two_idx = 0
-        for i, b in enumerate(self.bases):
-            if b == one:
-                one_idx = i
-            if b == two:
-                two_idx = i
-
-        return self.scores[(one_idx * self.base_count) + two_idx]
 
 ####################################################################################################
 
@@ -79,20 +14,20 @@ class IdentityScoringMatrix(object):
 
     def __init__(self, match=1, mismatch=-1):
 
-        self.match = match
-        self.mismatch = mismatch
+        self._match = match
+        self._mismatch = mismatch
 
     ##############################################
 
     def score(self, one, two, wildcard=None):
 
         if wildcard and (one in wildcard or two in wildcard):
-            return self.match
-
-        if one == two:
-            return self.match
-
-        return self.mismatch
+            return self._match
+        else:
+            if one == two:
+                return self._match
+            else:
+                return self._mismatch
 
 ####################################################################################################
 
@@ -141,7 +76,7 @@ class LocalAlignment(object):
 
     ##############################################
 
-    def align(self, ref, query, ref_name='', query_name='', rc=False):
+    def align(self, ref, query, ref_name='ref', query_name='query', rc=False):
 
         orig_ref = ref
         orig_query = query
@@ -149,10 +84,9 @@ class LocalAlignment(object):
         ref = ref.upper()
         query = query.upper()
 
-        matrix = Matrix(len(query) + 1, len(ref) + 1, (0, ' ', 0))
+        matrix = Matrix(len(query) +1, len(ref) +1, (0, ' ', 0))
         for row in xrange(1, matrix.rows):
             matrix.set(row, 0, (0, 'i', 0))
-
         for col in xrange(1, matrix.cols):
             matrix.set(0, col, (0, 'd', 0))
 
@@ -163,40 +97,40 @@ class LocalAlignment(object):
         # calculate matrix
         for row in xrange(1, matrix.rows):
             for col in xrange(1, matrix.cols):
-                mm_val = (matrix.get(row - 1, col - 1)[0] +
-                          self.scoring_matrix.score(query[row - 1], ref[col - 1], self.wildcard))
+                mm_val = (matrix.get(row -1, col -1)[0] +
+                          self.scoring_matrix.score(query[row -1], ref[col -1], self.wildcard))
 
                 ins_run = 0
                 del_run = 0
 
-                if matrix.get(row - 1, col)[1] == 'i':
-                    ins_run = matrix.get(row - 1, col)[2]
-                    if matrix.get(row - 1, col)[0] == 0:
+                if matrix.get(row -1, col)[1] == 'i':
+                    ins_run = matrix.get(row -1, col)[2]
+                    if matrix.get(row -1, col)[0] == 0:
                         # no penalty to start the alignment
                         ins_val = 0
                     else:
                         if not self.gap_extension_decay:
-                            ins_val = matrix.get(row - 1, col)[0] + self.gap_extension_penalty
+                            ins_val = matrix.get(row -1, col)[0] + self.gap_extension_penalty
                         else:
-                            ins_val = (matrix.get(row - 1, col)[0] +
+                            ins_val = (matrix.get(row -1, col)[0] +
                                        min(0, self.gap_extension_penalty + ins_run * self.gap_extension_decay))
                 else:
-                    ins_val = matrix.get(row - 1, col)[0] + self.gap_penalty
+                    ins_val = matrix.get(row -1, col)[0] + self.gap_penalty
 
-                if matrix.get(row, col - 1)[1] == 'd':
-                    del_run = matrix.get(row, col - 1)[2]
-                    if matrix.get(row, col - 1)[0] == 0:
+                if matrix.get(row, col -1)[1] == 'd':
+                    del_run = matrix.get(row, col -1)[2]
+                    if matrix.get(row, col -1)[0] == 0:
                         # no penalty to start the alignment
                         del_val = 0
                     else:
                         if not self.gap_extension_decay:
-                            del_val = matrix.get(row, col - 1)[0] + self.gap_extension_penalty
+                            del_val = matrix.get(row, col -1)[0] + self.gap_extension_penalty
                         else:
-                            del_val = (matrix.get(row, col - 1)[0] +
+                            del_val = (matrix.get(row, col -1)[0] +
                                        min(0, self.gap_extension_penalty + del_run * self.gap_extension_decay))
 
                 else:
-                    del_val = matrix.get(row, col - 1)[0] + self.gap_penalty
+                    del_val = matrix.get(row, col -1)[0] + self.gap_penalty
 
                 cell_val = max(mm_val, del_val, ins_val, 0)
 
@@ -205,9 +139,9 @@ class LocalAlignment(object):
                     del_run = 0
 
                 if del_run and cell_val == del_val:
-                    val = (cell_val, 'd', del_run + 1)
+                    val = (cell_val, 'd', del_run +1)
                 elif ins_run and cell_val == ins_val:
-                    val = (cell_val, 'i', ins_run + 1)
+                    val = (cell_val, 'i', ins_run +1)
                 elif cell_val == mm_val:
                     val = (cell_val, 'm', 0)
                 elif cell_val == del_val:
@@ -255,9 +189,13 @@ class LocalAlignment(object):
         aln.reverse()
 
         if self.verbose:
+            print '-'*80
             self.dump_matrix(ref, query, matrix, path)
+            print
             print aln
-            print (max_row, max_col), max_val
+            print
+            print 'max:', (max_row, max_col), max_val
+            print '-'*80
 
         cigar = _reduce_cigar(aln)
 
@@ -268,22 +206,24 @@ class LocalAlignment(object):
 
     def dump_matrix(self, ref, query, matrix, path, show_row=-1, show_col=-1):
 
-        sys.stdout.write('      -      ')
-        sys.stdout.write('       '.join(ref))
-        sys.stdout.write('\n')
+        output = sys.stdout
+
+        output.write('      -      ')
+        output.write('       '.join(ref))
+        output.write('\n')
         for row in xrange(matrix.rows):
             if row == 0:
-                sys.stdout.write('-')
+                output.write('-')
             else:
-                sys.stdout.write(query[row - 1])
+                output.write(query[row -1])
 
             for col in xrange(matrix.cols):
                 if show_row == row and show_col == col:
-                    sys.stdout.write('       *')
+                    output.write('       *')
                 else:
-                    sys.stdout.write(' %5s%s%s' % (matrix.get(row, col)[0], matrix.get(row, col)[1],
-                                                   '$' if (row, col) in path else ' '))
-            sys.stdout.write('\n')
+                    output.write(' %5s%s%s' % (matrix.get(row, col)[0], matrix.get(row, col)[1],
+                                               '$' if (row, col) in path else ' '))
+            output.write('\n')
 
 ####################################################################################################
 
@@ -484,9 +424,9 @@ class Alignment(object):
             else:
                 out.write('Ref  : %s (%s nt)\n\n' % (self.r_name, len(self.ref)))
 
-        poslens = [self.q_pos + 1, self.q_end + 1,
-                   self.r_pos + self.r_offset + 1,
-                   self.r_end + self.r_offset + 1]
+        poslens = [self.q_pos +1, self.q_end +1,
+                   self.r_pos + self.r_offset +1,
+                   self.r_end + self.r_offset +1]
         maxlen = max([len(str(x)) for x in poslens])
 
         q_pre = 'Query: %%%ss ' % maxlen
@@ -501,7 +441,7 @@ class Alignment(object):
 
         while q and r and m:
             if not self.rc:
-                out.write(q_pre % (qpos + 1))  # pos is displayed as 1-based
+                out.write(q_pre % (qpos +1))  # pos is displayed as 1-based
             else:
                 out.write(q_pre % (qpos))  # revcomp is 1-based on the 3' end
 
@@ -535,12 +475,12 @@ class Alignment(object):
             if not self.rc:
                 out.write(' %s\n' % qpos)
             else:
-                out.write(' %s\n' % (qpos + 1))
+                out.write(' %s\n' % (qpos +1))
 
             out.write(m_pre)
             out.write(mfragment)
             out.write('\n')
-            out.write(r_pre % (rpos + self.r_offset + 1))
+            out.write(r_pre % (rpos + self.r_offset +1))
             out.write(rfragment)
             for base in rfragment:
                 if base != '-':
@@ -553,109 +493,7 @@ class Alignment(object):
         out.write("CIGAR: %s\n" % self.cigar_str)
 
 ####################################################################################################
-
-def fasta_gen(fname):
-
-    def gen():
-        seq = ''
-        name = ''
-        comments = ''
-
-        if fname == '-':
-            f = sys.stdin
-            name = 'stdin'
-        else:
-            f = open(fname)
-
-        for line in f:
-            if line[0] == '>':
-                if name and seq:
-                    yield (name, seq, comments)
-
-                spl = line[1:].strip().split(' ', 1)
-                name = spl[0]
-                if len(spl) > 1:
-                    comments = spl[1]
-                else:
-                    comments = ''
-
-                seq = ''
-            else:
-                seq += line.strip()
-
-        if name and seq:
-            yield (name, seq, comments)
-
-        if fname != '-':
-            f.close()
-
-    return gen
-
-####################################################################################################
-
-def seq_gen(name, seq):
-
-    def gen():
-        yield (name, seq, '')
-
-    return gen
-
-####################################################################################################
-
-def extract_region(comments):
-
-    ref = None
-    start = None
-    # start_offset = 0
-    # end_offset = 0
-
-    try:
-        attrs = comments.split(' ')
-        for attr in attrs:
-            if '=' in attr:
-                k, v = attr.split('=')
-                if k == 'range':
-                    spl = v.split(':')
-                    ref = spl[0]
-                    start, end = [int(x) for x in spl[1].split('-')]
-                # elif k == "5'pad":
-                #     start_offset = int(v)
-                # elif k == "3'pad":
-                #     end_offset = int(v)
-    except:
-        pass
-
-    if ref and start:
-        return (ref, start - 1, '%s:%s-%s' % (ref, start, end))
-
-    return None
-
-####################################################################################################
-
-__revcomp = {}
-for a, b in zip('atcgATCGNn', 'tagcTAGCNn'):
-    __revcomp[a] = b
-__cache = {}
-
-####################################################################################################
-
-def revcomp(seq):
-
-    if seq in __cache:
-        return __cache[seq]
-
-    ret = []
-    for s in seq.upper()[::-1]:
-        ret.append(__revcomp[s])
-
-    __cache[seq] = ''.join(ret)
-
-    return __cache[seq]
-
-####################################################################################################
-
-# sw.align('ACACACTA','AGCACACA').dump()
-# aln = sw.align("AAGGGGAGGACGATGCGGATGTTC","AGGGAGGACGATGCGG")
-# aln.dump()
-
+# 
+# End
+# 
 ####################################################################################################
