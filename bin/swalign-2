@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+
+####################################################################################################
+
+import argparse
+
+####################################################################################################
+
+import swalign
+
+####################################################################################################
+
+parser = argparse.ArgumentParser(description='Smith-Waterman Aligner')
+
+parser.add_argument('reference_sequence', metavar='REF',
+                   help='Reference')
+
+parser.add_argument('query_sequence', metavar='QUERY',
+                   help='Query')
+
+args = parser.parse_args()
+
+####################################################################################################
+
+match = 2
+mismatch = -1
+gap_penalty = -1
+gap_extension_penalty = -1
+gap_extension_decay = 0.0
+
+wildcard = '' # '_'
+
+prefer_gap_runs = True
+
+verbose = True
+
+wrap = None
+
+####################################################################################################
+
+sw = swalign.LocalAlignment(
+    swalign.NucleotideScoringMatrix(match, mismatch),
+    gap_penalty, gap_extension_penalty, gap_extension_decay,
+    prefer_gap_runs,
+    verbose, wildcard)
+
+alignement = sw.align(args.reference_sequence, args.query_sequence)
+
+print
+alignement.dump(wrap)
+
+####################################################################################################
+# 
+# End
+# 
+####################################################################################################
